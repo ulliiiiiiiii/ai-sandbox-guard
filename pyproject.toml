@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-sandbox-guard"
+dynamic = ["version"]
+description = "Deterministic PreToolUse hook for Claude Code that keeps AI agents off the open internet."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "ulliiiiiiiii" }]
+keywords = ["claude-code", "hooks", "ai-agents", "guardrails", "security", "network"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Security",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["mypy>=1.11", "pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+ai-sandbox-guard = "ai_sandbox_guard.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/ulliiiiiiiii/ai-sandbox-guard"
+Issues = "https://github.com/ulliiiiiiiii/ai-sandbox-guard/issues"
+
+[tool.hatch.version]
+path = "ai_sandbox_guard/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ai_sandbox_guard"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["ai_sandbox_guard"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
