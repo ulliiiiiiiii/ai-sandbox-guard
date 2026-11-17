@@ -16,14 +16,22 @@ front of every tool call and blocks by exit code, whatever the model intends at 
 | --- | --- |
 | `WebSearch` | always blocked |
 | `WebFetch` | allowed for allowed hosts only |
-| `Bash` using `curl`, `wget`, `nc`, `socat`, `telnet`, `urllib`, `requests`, `httpx` or `aiohttp` | allowed only if every URL in the command points to an allowed host |
+| `Bash` using `curl`, `wget`, `nc`, `socat`, `telnet`, `urllib`, `requests`, `httpx` or `aiohttp` | allowed only if every target points to an allowed host |
 | anything else | allowed |
 
 Loopback (`localhost`, `127.0.0.0/8`, `::1`) is always allowed. `--allow` adds host names,
 globs like `*.lan` and networks like `10.0.0.0/8`. Hosts are compared after the URL has been
 parsed, so `https://localhost@example.com` counts as `example.com` and `127.0.0.1.example.com`
-is not loopback. A network command without any URL is blocked because its target cannot be
-checked.
+is not loopback. A URL with a backslash or a control character has no host at all, because
+parsers disagree about where its host ends.
+
+Shell commands are read word by word, the way the shell splits them after removing quotes. The
+targets of a command are every URL in it, the operands of `curl` and `wget` with or without a
+scheme, the host of `nc` and `telnet`, socat addresses, proxies (`-x`, `--proxy`, `*_proxy`
+variables) and the hosts in `--resolve` and `--connect-to`. Strings run through `bash -c` or
+`ssh` are read the same way. Inline Python that uses `urllib`, `requests`, `httpx` or `aiohttp`,
+imported in any form, is judged by the URLs it contains. A network command is blocked if it has
+no readable target or reads its targets from a file (`wget -i`, `curl -K`).
 
 When the same call is blocked three times in a row, the reason tells the agent to stop
 retrying and change its approach. Every decision is written to a JSON lines log with secrets

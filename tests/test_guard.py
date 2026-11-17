@@ -64,9 +64,46 @@ def test_malformed_events_do_not_raise(event):
     evaluate(event, HostPolicy())
 
 
+@pytest.mark.parametrize(
+    ("command", "allowed"),
+    [
+        ("curl -d @body.json -H 'Accept: a.b' http://localhost:8080/api | jq .id > id.txt", True),
+        ("wget -q -O- --timeout 5 http://localhost/health", True),
+        ("curl --max-time 2.5 -X POST http://localhost/ 2>&1", True),
+        ("socat TCP-LISTEN:8080,fork TCP:localhost:80", True),
+        ("echo $(curl http://localhost/) `curl -s http://127.0.0.1/`", True),
+        ("socat - TCP:example.com:80", False),
+        ("nc -x example.com:1080 localhost 80", False),
+        ("curl --resolve localhost:443:10.1.2.3 https://localhost/", False),
+        ("curl -K settings.txt", False),
+        ("ls | xargs curl http://localhost/", False),
+        ("echo `curl example.com`", False),
+        ("curl 'http://localhost/", False),
+        ("c''url http://localhost/ example.com", False),
+        ("curl http://localhost/ -- example.com", False),
+        ("ssh host \"bash -c 'curl example.com'\"", False),
+    ],
+)
+def test_shell_targets(command, allowed):
+    event = {"tool_name": "Bash", "tool_input": {"command": command}}
+    assert evaluate(event, HostPolicy()).allow is allowed
+
+
+def test_unreadable_targets_are_named():
+    event = {"tool_name": "Bash", "tool_input": {"command": "wget -i urls.txt"}}
+    assert evaluate(event, HostPolicy()).reason == (
+        "Network access to an unreadable target is blocked."
+    )
+
+
 def test_hostname_ignores_user_info_and_port():
     assert hostname("https://user:pw@example.com:8443/path") == "example.com"
     assert hostname("http://[broken/") is None
+
+
+@pytest.mark.parametrize("url", ["http://example.com\\@127.0.0.1/", "http://local\thost/"])
+def test_hostname_refuses_urls_parsers_disagree_on(url):
+    assert hostname(url) is None
 
 
 def test_redact():

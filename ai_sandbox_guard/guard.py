@@ -1,7 +1,7 @@
 """The decision: may this tool call reach the network?
 
-Only plain pattern and host matching, no model involved. The guard closes the usual paths
-an agent takes to the internet. It is not a sandbox: a process can still open sockets in
+Only word splitting, pattern and host matching, no model involved. The guard closes the usual
+paths an agent takes to the internet. It is not a sandbox: a process can still open sockets in
 ways no pattern catches, so pair it with egress rules on the host for a hard guarantee.
 """
 
@@ -13,13 +13,9 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlsplit
 
-NETWORK_COMMAND = re.compile(
-    r"\b(?:curl|wget|nc|ncat|netcat|socat|telnet)\b"
-    r"|\b(?:urllib\.request|http\.client|requests\.\w+|httpx\.\w+|aiohttp)\b"
-)
-URL = re.compile(r"\b[a-zA-Z][a-zA-Z0-9+.-]*://[^\s\"'<>`]+")
+from .targets import bash_targets, hostname
+
 SECRET = re.compile(
     r"Bearer\s+\S+|\bsk-[A-Za-z0-9_-]+|\b(?:api[_-]?key|token|secret|password)\S*=\S+",
     re.IGNORECASE,
@@ -56,14 +52,6 @@ class HostPolicy:
         return any(address in network for network in self.networks)
 
 
-def hostname(url: str) -> str | None:
-    """The host a URL connects to. User info and ports do not count as part of it."""
-    try:
-        return urlsplit(url).hostname
-    except ValueError:
-        return None
-
-
 def redact(text: str, limit: int = 200) -> str:
     return SECRET.sub("<redacted>", text)[:limit]
 
@@ -85,15 +73,16 @@ def evaluate(event: dict[str, Any], policy: HostPolicy) -> Decision:
         return Decision(False, f"Fetching {host or 'this URL'} directly is blocked.")
 
     if tool == "Bash":
-        command = str(tool_input.get("command") or "")
-        if not NETWORK_COMMAND.search(command):
+        network, hosts = bash_targets(str(tool_input.get("command") or ""))
+        if not network:
             return Decision(True)
-        hosts = [hostname(url) for url in URL.findall(command)]
         if not hosts:
             return Decision(
                 False, "Network commands without a URL are blocked, their target is unclear."
             )
-        blocked = sorted({host or "an unreadable URL" for host in hosts if not policy.allows(host)})
+        blocked = sorted(
+            {host or "an unreadable target" for host in hosts if not policy.allows(host)}
+        )
         if blocked:
             return Decision(False, f"Network access to {', '.join(blocked)} is blocked.")
 
